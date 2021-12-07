@@ -366,7 +366,6 @@ def possible_cards_from_hints(hints, card_counts):
 
 
 def select_action_ai(available_card_ids, player_id, table, hints, card_counts, discard_pile):
-  # if you have a card you know can be played (using hints + card counting), then play it
   required_cards = set()
   for k, v in table.items():
     if v < 5:
@@ -374,6 +373,7 @@ def select_action_ai(available_card_ids, player_id, table, hints, card_counts, d
 
   discard_pile_counts = Counter([(card.colour, card.value) for card in discard_pile])
 
+  # if you have a card you know can be played (using hints + card counting), then play it
   print(f'required cards: {required_cards}')
   for card_id in available_card_ids:
     possible_cards = set(possible_cards_from_hints(hints[player_id][card_id], card_counts))
@@ -394,9 +394,19 @@ def select_action_ai(available_card_ids, player_id, table, hints, card_counts, d
       print(f'can discard {card_id}')
 
   # give a hint
+  # iterate over the other players, starting with the next player
+  num_players = 5
+  for i in range(1, num_players):
+    other_player_id = (i + current_player) % num_players
 
-  for card_id in available_card_ids:
+    # does the other player have any cards that can be played now?
+    # do they have enough hints?
+
+    # does the other player have any cards that can be discarded now?
+    # do they have enough hints?
+
     pass
+
   # some strategies
   # - "avoid failure": with the information that the current player has, guess what the next player would do
   #   if the next player would do something that 1. causes them to lose the game 2. causes a mistake to happen
@@ -407,7 +417,6 @@ def select_action_ai(available_card_ids, player_id, table, hints, card_counts, d
   # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
   #   replenishing hints?)
   pass
-
 
 
 num_players = 5
