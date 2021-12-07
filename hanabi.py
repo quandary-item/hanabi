@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 import random
 from colorama import Back, Fore, init
@@ -181,7 +181,7 @@ class GameState:
         required_cards.add((k, v + 1))
     return required_cards
 
-  def get_cards_player_can_discard_from_hints(self, player_id):
+  def get_card_ids_player_can_discard_from_hints(self, player_id):
     discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
 
     for card_id in self.get_usable_cards(player_id):
@@ -199,7 +199,7 @@ class GameState:
       if can_discard:
         yield card_id
 
-  def get_cards_player_can_play_from_hints(self, player_id):
+  def get_card_ids_player_can_play_from_hints(self, player_id):
     required_cards = self.get_required_cards()
 
     for card_id in self.get_usable_cards(player_id):
@@ -209,57 +209,24 @@ class GameState:
       if all([card in required_cards for card in possible_cards]):
         yield card_id
 
-  def get_cards_player_can_discard(self, player_id):
+  def get_card_ids_player_can_discard(self, player_id):
     discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
 
     for card_id in self.get_usable_cards(player_id):
       card = self.hands[player_id][card_id]
       num_cards_not_discarded = CARD_COUNTS[card.colour][card.value] - discard_pile_counts[(card.colour, card.value)]
       already_played = card.value <= self.table[card.colour]
-      if not already_played and num_cards_not_discarded == 1:
+      if not already_played and num_cards_not_discarded > 1:
         yield card_id
 
-  def get_cards_player_can_play(self, player_id):
+  def get_card_ids_player_can_play(self, player_id):
     required_cards = self.get_required_cards()
     for card_id in self.get_usable_cards(player_id):
       card = self.hands[player_id][card_id]
       if (card.colour, card.value) in required_cards:
         yield card_id
 
-  def select_action_ai(self, player_id):
-    required_cards = self.get_required_cards()
-
-    # if you have a card you know can be played (using hints + card counting), then play it
-    print(f'required cards: {required_cards}')
-
-    cards_to_discard = list(self.get_cards_player_can_discard_from_hints(player_id))
-    cards_to_play = list(self.get_cards_player_can_play_from_hints(player_id))
-
-    print(f'can discard: {cards_to_discard}')
-    print(f'can play: {cards_to_play}')
-
-    # give a hint
-    # iterate over the other players, starting with the next player
-    num_players = len(self.players)
-    for i in range(1, num_players):
-      other_player_id = (i + player_id) % num_players
-      other_player_hand = self.hands[other_player_id]
-
-      can_play = []
-
-      for card_id in self.get_usable_cards(other_player_id):
-        other_players_card = self.hands[other_player_id][card_id]
-        if (other_players_card.colour, other_players_card.value) in required_cards:
-          pass
-
-      # does the other player have any cards that can be played now?
-      self.get_cards_player_can_play(other_player_id)
-      # do they have enough hints?
-
-      # does the other player have any cards that can be discarded now?
-      # do they have enough hints?
-
-      pass
+  def select_action_ai(self, player_id, actions):
 
     # some strategies
     # - "avoid failure": with the information that the current player has, guess what the next player would do
@@ -270,7 +237,65 @@ class GameState:
     #   a hint
     # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
     #   replenishing hints?)
-    pass
+
+    # if you have a card you know can be played (using hints + card counting), then play it
+    # print(f'required cards: {required_cards}')
+
+    cards_to_discard = list(self.get_card_ids_player_can_discard_from_hints(player_id))
+    if cards_to_discard:
+      action = [a for a in actions if a.name == 'discard' and a.args[0] in cards_to_discard][0]
+      return action
+
+    cards_to_play = list(self.get_card_ids_player_can_play_from_hints(player_id))
+    if cards_to_play:
+      action = [a for a in actions if a.name == 'play' and a.args[0] in cards_to_play][0]
+      return action
+
+    # print(f'can discard: {cards_to_discard}')
+    # print(f'can play: {cards_to_play}')
+
+    if self.hints_remaining == 0:
+      return random.choice(actions)
+
+    # give a hint
+    # iterate over the other players, starting with the next player
+    num_players = len(self.players)
+    for i in range(1, num_players):
+      other_player_id = (i + player_id) % num_players
+
+      # does the other player have any cards that can be played now?
+      can_play_ids = set(self.get_card_ids_player_can_play(other_player_id))
+      can_discard_ids = set(self.get_card_ids_player_can_discard(other_player_id))
+
+      # check if this card is 'covered' by the hints
+      cards_that_need_hints = set()
+      hints_needed = defaultdict(set)
+      # print(f'can play ids: {can_play_ids}')
+      # print(f'can discard ids: {can_discard_ids}')
+      for card_id in can_play_ids | can_discard_ids:
+        card = self.hands[other_player_id][card_id]
+
+        for colour in colour_values:
+          for value in card_values:
+            if colour != card.colour:
+              if self.hints[other_player_id][card_id][colour][value]:
+                hints_needed[card.colour].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+            if value != card.value:
+              if self.hints[other_player_id][card_id][colour][value]:
+                hints_needed[card.value].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+      # choose the hint that is needed by the most cards
+      cards_that_dont_need_hints = (can_play_ids | can_discard_ids) - cards_that_need_hints
+      if len(cards_that_dont_need_hints) == 0 and len(hints_needed) > 0:
+        # pick a hint if there aren't any cards that can be played next
+        print(other_player_id, hints_needed)
+        best_hint = max(hints_needed.keys(), key=lambda k: len(hints_needed[k]))
+        # print(f'the best hint for player {other_player_id} is {best_hint}')
+        hint_action = [a for a in actions if a.name == 'hint' and a.args[3] == best_hint][0]
+        return hint_action
 
 
   def apply_action(self, player_id: int, action: Action):
@@ -502,12 +527,11 @@ while True:
       print(' ', format_hand(hand), Fore.BLACK)
 
   # selected_action_i = get_int()
-  game.select_action_ai(
-    current_player
-  )
+  action = game.select_action_ai(current_player, actions)
+  print(f'ai recommended action:{action}')
 
   # action = actions[selected_action_i]
-  action = select_action(actions)
+  # action = select_action(actions)
   print(Fore.BLACK + str(action), len(game.deck))
 
   try:
