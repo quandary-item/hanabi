@@ -1,7 +1,7 @@
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 import random
-from colorama import Back, Fore, init
+from colorama import Fore, init
 from typing import Any, Dict, List, Literal, Optional, Set
 
 init()
@@ -489,54 +489,59 @@ def possible_cards_from_hints(hints, card_counts):
         yield (colour, card_value)
 
 
-num_players = 5
-current_player = 0
+def run():
+  num_players = 5
+  current_player = 0
 
-game = GameState([PlayerKnowledge(i) for i in range(num_players)])
-print(format_deck(game.deck))
+  game = GameState([PlayerKnowledge(i) for i in range(num_players)])
+  print(format_deck(game.deck))
 
-while True:
-  actions = game.get_available_actions(current_player)
+  while True:
+    actions = game.get_available_actions(current_player)
 
-  if not actions:
-    # no more actions
-    print('no more available actions')
-    break
+    if not actions:
+      # no more actions
+      print('no more available actions')
+      break
 
-  print(Fore.BLACK + 'Current player', str(current_player))
-  print('hints:')
-  for player_id in range(num_players):
-    print(player_id, 'hints')
-    print(''.join(format_hints(game.hints[player_id], game.players[current_player].card_counts)))
-  # print('deck:', format_deck(game.deck))
-  print('discard pile:', format_deck(game.discard_pile))
-  print(Fore.BLACK + 'table:', format_table(game.table))
-  print('hints remaining:', game.hints_remaining)
-  print('mistakes remaining:', game.mistakes_remaining)
+    print(Fore.BLACK + 'Current player', str(current_player))
+    print('hints:')
+    for player_id in range(num_players):
+      print(player_id, 'hints')
+      print(''.join(format_hints(game.hints[player_id], game.players[current_player].card_counts)))
+    # print('deck:', format_deck(game.deck))
+    print('discard pile:', format_deck(game.discard_pile))
+    print(Fore.BLACK + 'table:', format_table(game.table))
+    print('hints remaining:', game.hints_remaining)
+    print('mistakes remaining:', game.mistakes_remaining)
 
-  # for each card in the player's hand
-  # figure out what values the card could have
-  # figure out if the game would end if the card was played / discarded
-  # and turned out to be the wrong card
-  # compared probabilities
-  for i, hand in enumerate(game.hands):
-    if i == current_player:
-      # print('*', format_hand(hand), Fore.BLACK)
-      print(Fore.BLACK + '*', '------')
-    else:
-      print(' ', format_hand(hand), Fore.BLACK)
+    # for each card in the player's hand
+    # figure out what values the card could have
+    # figure out if the game would end if the card was played / discarded
+    # and turned out to be the wrong card
+    # compared probabilities
+    for i, hand in enumerate(game.hands):
+      if i == current_player:
+        # print('*', format_hand(hand), Fore.BLACK)
+        print(Fore.BLACK + '*', '------')
+      else:
+        print(' ', format_hand(hand), Fore.BLACK)
 
-  # selected_action_i = get_int()
-  action = game.select_action_ai(current_player, actions)
-  print(f'ai recommended action:{action}')
+    # selected_action_i = get_int()
+    action = game.select_action_ai(current_player, actions)
+    print(f'ai recommended action:{action}')
 
-  # action = actions[selected_action_i]
-  # action = select_action(actions)
-  print(Fore.BLACK + str(action), len(game.deck))
+    # action = actions[selected_action_i]
+    # action = select_action(actions)
+    print(Fore.BLACK + str(action), len(game.deck))
 
-  try:
-    game.apply_action(current_player, action)
-  except GameOver as e:
-    print('game over:', e)
-    break
-  current_player = (current_player + 1) % num_players
+    try:
+      game.apply_action(current_player, action)
+    except GameOver as e:
+      print('game over:', e)
+      break
+    current_player = (current_player + 1) % num_players
+
+
+if __name__ == '__main__':
+  run()
