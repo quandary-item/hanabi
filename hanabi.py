@@ -241,14 +241,15 @@ class GameState:
     # if you have a card you know can be played (using hints + card counting), then play it
     # print(f'required cards: {required_cards}')
 
-    cards_to_discard = list(self.get_card_ids_player_can_discard_from_hints(player_id))
-    if cards_to_discard:
-      action = [a for a in actions if a.name == 'discard' and a.args[0] in cards_to_discard][0]
-      return action
 
     cards_to_play = list(self.get_card_ids_player_can_play_from_hints(player_id))
     if cards_to_play:
       action = [a for a in actions if a.name == 'play' and a.args[0] in cards_to_play][0]
+      return action
+
+    cards_to_discard = list(self.get_card_ids_player_can_discard_from_hints(player_id))
+    if cards_to_discard:
+      action = [a for a in actions if a.name == 'discard' and a.args[0] in cards_to_discard][0]
       return action
 
     # print(f'can discard: {cards_to_discard}')
@@ -262,6 +263,8 @@ class GameState:
     num_players = len(self.players)
     for i in range(1, num_players):
       other_player_id = (i + player_id) % num_players
+
+      # TODO: Look for hints for playing and discarding cards separately
 
       # does the other player have any cards that can be played now?
       can_play_ids = set(self.get_card_ids_player_can_play(other_player_id))
