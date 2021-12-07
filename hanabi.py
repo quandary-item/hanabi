@@ -174,6 +174,105 @@ class GameState:
 
     return actions
 
+  def get_required_cards(self):
+    required_cards = set()
+    for k, v in self.table.items():
+      if v < 5:
+        required_cards.add((k, v + 1))
+    return required_cards
+
+  def get_cards_player_can_discard_from_hints(self, player_id):
+    discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
+
+    for card_id in self.get_usable_cards(player_id):
+      possible_cards = set(
+        possible_cards_from_hints(self.hints[player_id][card_id], self.players[player_id].card_counts)
+      )
+
+      can_discard = True
+      for card_colour, card_value in possible_cards:
+        num_cards_not_discarded = CARD_COUNTS[card_colour][card_value] - discard_pile_counts[(card_colour, card_value)]
+        # if the card has already been played, then it can also be discarded
+        already_played = card_value <= self.table[card_colour]
+        if not already_played and num_cards_not_discarded == 1:
+          can_discard = False
+      if can_discard:
+        yield card_id
+
+  def get_cards_player_can_play_from_hints(self, player_id):
+    required_cards = self.get_required_cards()
+
+    for card_id in self.get_usable_cards(player_id):
+      possible_cards = set(
+        possible_cards_from_hints(self.hints[player_id][card_id], self.players[player_id].card_counts)
+      )
+      if all([card in required_cards for card in possible_cards]):
+        yield card_id
+
+  def get_cards_player_can_discard(self, player_id):
+    discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
+
+    for card_id in self.get_usable_cards(player_id):
+      card = self.hands[player_id][card_id]
+      num_cards_not_discarded = CARD_COUNTS[card.colour][card.value] - discard_pile_counts[(card.colour, card.value)]
+      already_played = card.value <= self.table[card.colour]
+      if not already_played and num_cards_not_discarded == 1:
+        yield card_id
+
+  def get_cards_player_can_play(self, player_id):
+    required_cards = self.get_required_cards()
+    for card_id in self.get_usable_cards(player_id):
+      card = self.hands[player_id][card_id]
+      if (card.colour, card.value) in required_cards:
+        yield card_id
+
+  def select_action_ai(self, player_id):
+    required_cards = self.get_required_cards()
+
+    # if you have a card you know can be played (using hints + card counting), then play it
+    print(f'required cards: {required_cards}')
+
+    cards_to_discard = list(self.get_cards_player_can_discard_from_hints(player_id))
+    cards_to_play = list(self.get_cards_player_can_play_from_hints(player_id))
+
+    print(f'can discard: {cards_to_discard}')
+    print(f'can play: {cards_to_play}')
+
+    # give a hint
+    # iterate over the other players, starting with the next player
+    num_players = len(self.players)
+    for i in range(1, num_players):
+      other_player_id = (i + player_id) % num_players
+      other_player_hand = self.hands[other_player_id]
+
+      can_play = []
+
+      for card_id in self.get_usable_cards(other_player_id):
+        other_players_card = self.hands[other_player_id][card_id]
+        if (other_players_card.colour, other_players_card.value) in required_cards:
+          pass
+
+      # does the other player have any cards that can be played now?
+      self.get_cards_player_can_play(other_player_id)
+      # do they have enough hints?
+
+      # does the other player have any cards that can be discarded now?
+      # do they have enough hints?
+
+      pass
+
+    # some strategies
+    # - "avoid failure": with the information that the current player has, guess what the next player would do
+    #   if the next player would do something that 1. causes them to lose the game 2. causes a mistake to happen
+    #   then give them a hint so that that doesn't happen. this could allow us to be a little bit more loose with
+    #   the play/discard logic. also this would be useful if the number of available hints is a low number
+    # - "play for success": look at the required cards, if the next player could play any of them, then give them
+    #   a hint
+    # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
+    #   replenishing hints?)
+    pass
+
+
   def apply_action(self, player_id: int, action: Action):
     if action.name == 'discard':
       (card_id,) = action.args
@@ -365,60 +464,6 @@ def possible_cards_from_hints(hints, card_counts):
         yield (colour, card_value)
 
 
-def select_action_ai(available_card_ids, player_id, table, hints, card_counts, discard_pile):
-  required_cards = set()
-  for k, v in table.items():
-    if v < 5:
-      required_cards.add((k, v + 1))
-
-  discard_pile_counts = Counter([(card.colour, card.value) for card in discard_pile])
-
-  # if you have a card you know can be played (using hints + card counting), then play it
-  print(f'required cards: {required_cards}')
-  for card_id in available_card_ids:
-    possible_cards = set(possible_cards_from_hints(hints[player_id][card_id], card_counts))
-    matches_required_cards = all([card in required_cards for card in possible_cards])
-    if matches_required_cards:
-      print(f'can play {card_id}')
-
-    # determine whether we can discard this card
-    can_discard = True
-    for card_colour, card_value in possible_cards:
-      num_cards_not_discarded = CARD_COUNTS[card_colour][card_value] - discard_pile_counts[(card_colour, card_value)]
-      # if the card has already been played, then it can also be discarded
-      already_played = card_value <= table[card_colour]
-      if not already_played and num_cards_not_discarded == 1:
-        can_discard = False
-
-    if can_discard:
-      print(f'can discard {card_id}')
-
-  # give a hint
-  # iterate over the other players, starting with the next player
-  num_players = 5
-  for i in range(1, num_players):
-    other_player_id = (i + current_player) % num_players
-
-    # does the other player have any cards that can be played now?
-    # do they have enough hints?
-
-    # does the other player have any cards that can be discarded now?
-    # do they have enough hints?
-
-    pass
-
-  # some strategies
-  # - "avoid failure": with the information that the current player has, guess what the next player would do
-  #   if the next player would do something that 1. causes them to lose the game 2. causes a mistake to happen
-  #   then give them a hint so that that doesn't happen. this could allow us to be a little bit more loose with
-  #   the play/discard logic. also this would be useful if the number of available hints is a low number
-  # - "play for success": look at the required cards, if the next player could play any of them, then give them
-  #   a hint
-  # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
-  #   replenishing hints?)
-  pass
-
-
 num_players = 5
 current_player = 0
 
@@ -457,14 +502,8 @@ while True:
       print(' ', format_hand(hand), Fore.BLACK)
 
   # selected_action_i = get_int()
-  available_card_ids = game.get_usable_cards(current_player)
-  select_action_ai(
-    available_card_ids,
-    current_player,
-    game.table,
-    game.hints,
-    game.players[current_player].card_counts,
-    game.discard_pile
+  game.select_action_ai(
+    current_player
   )
 
   # action = actions[selected_action_i]
