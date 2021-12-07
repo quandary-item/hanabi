@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import Counter
 from dataclasses import dataclass
 import random
 from colorama import Back, Fore, init
@@ -52,6 +52,14 @@ class Action:
 
 # How do you describe what you know about the things that other people know?
 
+CARD_COUNTS = {
+  colour: {1: 3, 2: 2, 3: 2, 4: 2, 5: 1}
+  for colour in colour_values
+}
+
+ALL_CARD_IDS = range(5)
+
+
 class GameOver(Exception):
   pass
 
@@ -82,14 +90,11 @@ def create_deck() -> List[Card]:
 class PlayerKnowledge:
   def __init__(self, index):
     self.index = index
-    self.card_counts = {
-      colour: {1: 3, 2: 2, 3: 2, 4: 2, 5: 1}
-      for colour in colour_values
-    }
+    self.card_counts = {colour: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0} for colour in colour_values}
 
   def see_card(self, card):
     # Call this when somebody drew a card
-    self.card_counts[card.colour][card.value] -= 1
+    self.card_counts[card.colour][card.value] += 1
 
 def initial_hints():
   return {
@@ -115,7 +120,7 @@ class GameState:
     self.hints = []
     for player in self.players:
       player_hints = []
-      for card_id in range(5):
+      for card_id in ALL_CARD_IDS:
         player_hints.append(initial_hints())
 
       self.hints.append(player_hints)
@@ -124,13 +129,20 @@ class GameState:
     self.hands = []
     for player_id, player in enumerate(self.players):
       hand = []
-      for i in range(5):
+      for i in ALL_CARD_IDS:
         card = self.deck.pop()
         hand.append(card)
         for other_player_id, other_player in enumerate(self.players):
           if player_id != other_player_id:
             other_player.see_card(card)
       self.hands.append(hand)
+
+  def get_usable_cards(self, player_id: int):
+    result = []
+    for i, card in enumerate(self.hands[player_id]):
+      if card:
+        result.append(i)
+    return result
 
   def get_available_actions(self, player_id: int) -> List[Action]:
     actions = []
@@ -214,15 +226,31 @@ class GameState:
       (other_player_id, other_players_cards, hint_type, hint_value) = action.args
       # Send the hint to the other players
       if hint_type == 'colour':
+        # mark the cards that were hinted
         for card_id in other_players_cards:
           for colour in colour_values:
             if hint_value != colour:
               for other_card_value in card_values:
                 self.hints[other_player_id][card_id][colour][other_card_value] = False
+
+        # mark the cards that were not hinted
+        for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
+          for colour in colour_values:
+            if hint_value == colour:
+              for other_card_value in card_values:
+                self.hints[other_player_id][card_id][colour][other_card_value] = False
       else:
+        # mark the cards that were hinted
         for card_id in other_players_cards:
           for other_value in card_values:
             if hint_value != other_value:
+              for colour in colour_values:
+                self.hints[other_player_id][card_id][colour][other_value] = False
+
+        # mark the cards that were not hinted
+        for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
+          for other_value in card_values:
+            if hint_value == other_value:
               for colour in colour_values:
                 self.hints[other_player_id][card_id][colour][other_value] = False
 
@@ -258,18 +286,20 @@ def format_hand(hand):
 
 def format_hints(player_hints, card_counts):
   for colour in colour_values:
-    for card_id in range(5):
+    for card_id in ALL_CARD_IDS:
       yield Fore.BLACK
       yield '|'
       for value in card_values:
         if player_hints[card_id][colour][value]:
           yield colour_code[colour]
 
-          if card_counts[colour][value] == 3:
+          # num cards that have not been seen or played/discarded
+          num_cards_remaining = CARD_COUNTS[colour][value] - card_counts[colour][value]
+          if num_cards_remaining == 3:
             yield str(value) * 3
-          elif card_counts[colour][value] == 2:
+          elif num_cards_remaining == 2:
             yield str(value) * 2 + ' '
-          elif card_counts[colour][value] == 1:
+          elif num_cards_remaining == 1:
             yield str(value) + '  '
           else:
             yield '   '
@@ -328,6 +358,58 @@ def select_action(actions: List[Action]):
   return action
 
 
+def possible_cards_from_hints(hints, card_counts):
+  for colour, v in hints.items():
+    for card_value, x in v.items():
+      if x and CARD_COUNTS[colour][card_value] - card_counts[colour][card_value > 0]:
+        yield (colour, card_value)
+
+
+def select_action_ai(available_card_ids, player_id, table, hints, card_counts, discard_pile):
+  # if you have a card you know can be played (using hints + card counting), then play it
+  required_cards = set()
+  for k, v in table.items():
+    if v < 5:
+      required_cards.add((k, v + 1))
+
+  discard_pile_counts = Counter([(card.colour, card.value) for card in discard_pile])
+
+  print(f'required cards: {required_cards}')
+  for card_id in available_card_ids:
+    possible_cards = set(possible_cards_from_hints(hints[player_id][card_id], card_counts))
+    matches_required_cards = all([card in required_cards for card in possible_cards])
+    if matches_required_cards:
+      print(f'can play {card_id}')
+
+    # determine whether we can discard this card
+    can_discard = True
+    for card_colour, card_value in possible_cards:
+      num_cards_not_discarded = CARD_COUNTS[card_colour][card_value] - discard_pile_counts[(card_colour, card_value)]
+      # if the card has already been played, then it can also be discarded
+      already_played = card_value <= table[card_colour]
+      if not already_played and num_cards_not_discarded == 1:
+        can_discard = False
+
+    if can_discard:
+      print(f'can discard {card_id}')
+
+  # give a hint
+
+  for card_id in available_card_ids:
+    pass
+  # some strategies
+  # - "avoid failure": with the information that the current player has, guess what the next player would do
+  #   if the next player would do something that 1. causes them to lose the game 2. causes a mistake to happen
+  #   then give them a hint so that that doesn't happen. this could allow us to be a little bit more loose with
+  #   the play/discard logic. also this would be useful if the number of available hints is a low number
+  # - "play for success": look at the required cards, if the next player could play any of them, then give them
+  #   a hint
+  # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
+  #   replenishing hints?)
+  pass
+
+
+
 num_players = 5
 current_player = 0
 
@@ -366,6 +448,15 @@ while True:
       print(' ', format_hand(hand), Fore.BLACK)
 
   # selected_action_i = get_int()
+  available_card_ids = game.get_usable_cards(current_player)
+  select_action_ai(
+    available_card_ids,
+    current_player,
+    game.table,
+    game.hints,
+    game.players[current_player].card_counts,
+    game.discard_pile
+  )
 
   # action = actions[selected_action_i]
   action = select_action(actions)
