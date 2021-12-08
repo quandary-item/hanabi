@@ -4,7 +4,6 @@ import random
 from colorama import Fore, init
 from typing import Any, Dict, List, Literal, Optional, Set
 
-init()
 
 Colour = Literal['red', 'yellow', 'green', 'blue', 'white']
 colour_values: List[Colour] = ['red', 'yellow', 'green', 'blue', 'white']
@@ -226,7 +225,7 @@ class GameState:
       if (card.colour, card.value) in required_cards:
         yield card_id
 
-  def select_action_ai(self, player_id, actions):
+  def select_action_ai(self, last_move: Action, player_id: int, actions: List[Action]):
 
     # some strategies
     # - "avoid failure": with the information that the current player has, guess what the next player would do
@@ -238,8 +237,16 @@ class GameState:
     # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
     #   replenishing hints?)
 
+    # - "remember hints": e.g if a player gave you a hint that you have a "one" and since then nobody has played
+    #   a one, then assume you can play that card. same goes for other colours etc. also need to change logic so
+    #   that players aren't given redundant hints?
+
     # if you have a card you know can be played (using hints + card counting), then play it
     # print(f'required cards: {required_cards}')
+
+    if last_move:
+
+      pass
 
 
     cards_to_play = list(self.get_card_ids_player_can_play_from_hints(player_id))
@@ -272,33 +279,61 @@ class GameState:
 
       # check if this card is 'covered' by the hints
       cards_that_need_hints = set()
-      hints_needed = defaultdict(set)
+
+      play_hints_needed = defaultdict(set)
       # print(f'can play ids: {can_play_ids}')
       # print(f'can discard ids: {can_discard_ids}')
-      for card_id in can_play_ids | can_discard_ids:
+      for card_id in can_play_ids:
         card = self.hands[other_player_id][card_id]
 
         for colour in colour_values:
           for value in card_values:
             if colour != card.colour:
               if self.hints[other_player_id][card_id][colour][value]:
-                hints_needed[card.colour].add(card_id)
+                play_hints_needed[card.colour].add(card_id)
                 cards_that_need_hints.add(card_id)
 
             if value != card.value:
               if self.hints[other_player_id][card_id][colour][value]:
-                hints_needed[card.value].add(card_id)
+                play_hints_needed[card.value].add(card_id)
                 cards_that_need_hints.add(card_id)
+
+      discard_hints_needed = defaultdict(set)
+      # print(f'can play ids: {can_play_ids}')
+      # print(f'can discard ids: {can_discard_ids}')
+      for card_id in can_discard_ids:
+        card = self.hands[other_player_id][card_id]
+
+        for colour in colour_values:
+          for value in card_values:
+            if colour != card.colour:
+              if self.hints[other_player_id][card_id][colour][value]:
+                discard_hints_needed[card.colour].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+            if value != card.value:
+              if self.hints[other_player_id][card_id][colour][value]:
+                discard_hints_needed[card.value].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+      # select hints that would allow the other player to make a move this turn
+      # TODO: hints should be (colour, value) -> boolean
+
 
       # choose the hint that is needed by the most cards
       cards_that_dont_need_hints = (can_play_ids | can_discard_ids) - cards_that_need_hints
-      if len(cards_that_dont_need_hints) == 0 and len(hints_needed) > 0:
+      if len(cards_that_dont_need_hints) == 0:
+        if discard_hints_needed:
+          best_hint = max(discard_hints_needed.keys(), key=lambda k: len(discard_hints_needed[k]))
+          hint_action = [a for a in actions if a.name == 'hint' and a.args[3] == best_hint][0]
+          return hint_action
+        elif play_hints_needed:
+          best_hint = max(play_hints_needed.keys(), key=lambda k: len(play_hints_needed[k]))
+          hint_action = [a for a in actions if a.name == 'hint' and a.args[3] == best_hint][0]
+          return hint_action
+
         # pick a hint if there aren't any cards that can be played next
-        print(other_player_id, hints_needed)
-        best_hint = max(hints_needed.keys(), key=lambda k: len(hints_needed[k]))
-        # print(f'the best hint for player {other_player_id} is {best_hint}')
-        hint_action = [a for a in actions if a.name == 'hint' and a.args[3] == best_hint][0]
-        return hint_action
+
 
 
   def apply_action(self, player_id: int, action: Action):
@@ -531,7 +566,7 @@ def run():
         print(' ', format_hand(hand), Fore.BLACK)
 
     # selected_action_i = get_int()
-    action = game.select_action_ai(current_player, actions)
+    action = game.select_action_ai(None, current_player, actions)
     print(f'ai recommended action:{action}')
 
     # action = actions[selected_action_i]
@@ -547,4 +582,5 @@ def run():
 
 
 if __name__ == '__main__':
+  init()
   run()
