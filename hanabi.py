@@ -97,8 +97,9 @@ class PlayerKnowledge:
 
 def initial_hints():
   return {
-    colour: {1: True, 2: True, 3: True, 4: True, 5: True}
+    (colour, value): True
     for colour in colour_values
+    for value in card_values
   }
 
 class GameState:
@@ -289,12 +290,12 @@ class GameState:
         for colour in colour_values:
           for value in card_values:
             if colour != card.colour:
-              if self.hints[other_player_id][card_id][colour][value]:
+              if self.hints[other_player_id][card_id][(colour, value)]:
                 play_hints_needed[card.colour].add(card_id)
                 cards_that_need_hints.add(card_id)
 
             if value != card.value:
-              if self.hints[other_player_id][card_id][colour][value]:
+              if self.hints[other_player_id][card_id][(colour, value)]:
                 play_hints_needed[card.value].add(card_id)
                 cards_that_need_hints.add(card_id)
 
@@ -307,12 +308,12 @@ class GameState:
         for colour in colour_values:
           for value in card_values:
             if colour != card.colour:
-              if self.hints[other_player_id][card_id][colour][value]:
+              if self.hints[other_player_id][card_id][(colour, value)]:
                 discard_hints_needed[card.colour].add(card_id)
                 cards_that_need_hints.add(card_id)
 
             if value != card.value:
-              if self.hints[other_player_id][card_id][colour][value]:
+              if self.hints[other_player_id][card_id][(colour, value)]:
                 discard_hints_needed[card.value].add(card_id)
                 cards_that_need_hints.add(card_id)
 
@@ -393,28 +394,28 @@ class GameState:
           for colour in colour_values:
             if hint_value != colour:
               for other_card_value in card_values:
-                self.hints[other_player_id][card_id][colour][other_card_value] = False
+                self.hints[other_player_id][card_id][(colour, other_card_value)] = False
 
         # mark the cards that were not hinted
         for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
           for colour in colour_values:
             if hint_value == colour:
               for other_card_value in card_values:
-                self.hints[other_player_id][card_id][colour][other_card_value] = False
+                self.hints[other_player_id][card_id][(colour, other_card_value)] = False
       else:
         # mark the cards that were hinted
         for card_id in other_players_cards:
           for other_value in card_values:
             if hint_value != other_value:
               for colour in colour_values:
-                self.hints[other_player_id][card_id][colour][other_value] = False
+                self.hints[other_player_id][card_id][(colour, other_value)] = False
 
         # mark the cards that were not hinted
         for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
           for other_value in card_values:
             if hint_value == other_value:
               for colour in colour_values:
-                self.hints[other_player_id][card_id][colour][other_value] = False
+                self.hints[other_player_id][card_id][(colour, other_value)] = False
 
 
 colour_code = {'red': Fore.RED, 'yellow': Fore.YELLOW, 'green': Fore.GREEN, 'blue': Fore.BLUE, 'white': Fore.BLACK}
@@ -452,7 +453,7 @@ def format_hints(player_hints, card_counts):
       yield Fore.BLACK
       yield '|'
       for value in card_values:
-        if player_hints[card_id][colour][value]:
+        if player_hints[card_id][(colour, value)]:
           yield colour_code[colour]
 
           # num cards that have not been seen or played/discarded
@@ -521,10 +522,9 @@ def select_action(actions: List[Action]):
 
 
 def possible_cards_from_hints(hints, card_counts):
-  for colour, v in hints.items():
-    for card_value, x in v.items():
-      if x and CARD_COUNTS[colour][card_value] - card_counts[colour][card_value > 0]:
-        yield (colour, card_value)
+  for colour, value in hints.keys():
+    if hints[(colour, value)] and CARD_COUNTS[colour][value] - card_counts[colour][value > 0]:
+      yield (colour, value)
 
 
 def run():
