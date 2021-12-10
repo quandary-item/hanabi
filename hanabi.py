@@ -1,7 +1,7 @@
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 import random
-from colorama import Fore, init
+from colorama import Fore, init  # type: ignore
 from typing import Any, Dict, List, Literal, Optional, Set
 
 
@@ -318,7 +318,6 @@ class GameState:
                 cards_that_need_hints.add(card_id)
 
       # select hints that would allow the other player to make a move this turn
-      # TODO: hints should be (colour, value) -> boolean
 
 
       # choose the hint that is needed by the most cards
@@ -390,32 +389,28 @@ class GameState:
       # Send the hint to the other players
       if hint_type == 'colour':
         # mark the cards that were hinted
+        other_colours = [value for value in colour_values if value != hint_value]
         for card_id in other_players_cards:
-          for colour in colour_values:
-            if hint_value != colour:
-              for other_card_value in card_values:
-                self.hints[other_player_id][card_id][(colour, other_card_value)] = False
+          for colour in other_colours:
+            for other_card_value in card_values:
+              self.hints[other_player_id][card_id][(colour, other_card_value)] = False
 
         # mark the cards that were not hinted
         for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
-          for colour in colour_values:
-            if hint_value == colour:
-              for other_card_value in card_values:
-                self.hints[other_player_id][card_id][(colour, other_card_value)] = False
+          for other_card_value in card_values:
+            self.hints[other_player_id][card_id][(hint_value, other_card_value)] = False
       else:
+        other_values = [value for value in card_values if value != hint_value]
         # mark the cards that were hinted
         for card_id in other_players_cards:
-          for other_value in card_values:
-            if hint_value != other_value:
-              for colour in colour_values:
-                self.hints[other_player_id][card_id][(colour, other_value)] = False
+          for other_value in other_values:
+            for colour in colour_values:
+              self.hints[other_player_id][card_id][(colour, other_value)] = False
 
         # mark the cards that were not hinted
         for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
-          for other_value in card_values:
-            if hint_value == other_value:
-              for colour in colour_values:
-                self.hints[other_player_id][card_id][(colour, other_value)] = False
+          for colour in colour_values:
+            self.hints[other_player_id][card_id][(colour, hint_value)] = False
 
 
 colour_code = {'red': Fore.RED, 'yellow': Fore.YELLOW, 'green': Fore.GREEN, 'blue': Fore.BLUE, 'white': Fore.BLACK}
@@ -484,7 +479,7 @@ def get_int():
 
   return result
 
-def select_action(actions: List[Action]):
+def select_action(hands, actions: List[Action]):
   print('Which type of action do you want to perform?')
   print('1. discard')
   print('2. play')
@@ -506,7 +501,7 @@ def select_action(actions: List[Action]):
     print(f'Which player would you like to hint? {available_players_to_hint}')
     other_player_id = get_int()
 
-    print(f'Player {other_player_id}\'s cards: ' + format_hand(game.hands[other_player_id]) + Fore.BLACK)
+    print(f'Player {other_player_id}\'s cards: ' + format_hand(hands[other_player_id]) + Fore.BLACK)
 
     available_hints = [action for action in actions if action.name == 'hint' and action.args[0] == other_player_id]
 
@@ -570,7 +565,7 @@ def run():
     print(f'ai recommended action:{action}')
 
     # action = actions[selected_action_i]
-    # action = select_action(actions)
+    # action = select_action(game.hands, actions)
     print(Fore.BLACK + str(action), len(game.deck))
 
     try:
