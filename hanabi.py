@@ -335,9 +335,7 @@ class GameState:
         # pick a hint if there aren't any cards that can be played next
 
 
-  def apply_hint(self, card_id, card_hints, card_ids_to_hint, hint_type, hint_value):
-
-    do_hint = card_id in card_ids_to_hint
+  def apply_hint(self, do_hint: bool, card_hints, hint_type, hint_value):
 
     # Send the hint to the other players
     if hint_type == 'colour':
@@ -414,9 +412,8 @@ class GameState:
 
       self.hints[other_player_id] = [
         self.apply_hint(
-          card_id,
+          card_id in card_ids_to_hint,
           self.hints[other_player_id][card_id],
-          card_ids_to_hint,
           hint_type,
           hint_value
         )
