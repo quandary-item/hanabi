@@ -385,30 +385,33 @@ class GameState:
 
     elif action.name == 'hint':
       self.hints_remaining -= 1
-      (other_player_id, other_players_cards, hint_type, hint_value) = action.args
+      (other_player_id, card_ids_to_hint, hint_type, hint_value) = action.args
+
+      card_ids_to_unhint = set(self.get_usable_cards(other_player_id)) - set(card_ids_to_hint)
+
       # Send the hint to the other players
       if hint_type == 'colour':
         # mark the cards that were hinted
         other_colours = [value for value in colour_values if value != hint_value]
-        for card_id in other_players_cards:
+        for card_id in card_ids_to_hint:
           for colour in other_colours:
             for other_card_value in card_values:
               self.hints[other_player_id][card_id][(colour, other_card_value)] = False
 
         # mark the cards that were not hinted
-        for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
+        for card_id in card_ids_to_unhint:
           for other_card_value in card_values:
             self.hints[other_player_id][card_id][(hint_value, other_card_value)] = False
       else:
-        other_values = [value for value in card_values if value != hint_value]
         # mark the cards that were hinted
-        for card_id in other_players_cards:
+        other_values = [value for value in card_values if value != hint_value]
+        for card_id in card_ids_to_hint:
           for other_value in other_values:
             for colour in colour_values:
               self.hints[other_player_id][card_id][(colour, other_value)] = False
 
         # mark the cards that were not hinted
-        for card_id in set(self.get_usable_cards(other_player_id)) - set(other_players_cards):
+        for card_id in card_ids_to_unhint:
           for colour in colour_values:
             self.hints[other_player_id][card_id][(colour, hint_value)] = False
 
