@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+import itertools
 import random
 from colorama import Fore, init  # type: ignore
 from typing import Any, Dict, List, Literal, Optional, Set
@@ -336,28 +337,20 @@ class GameState:
 
 
   def apply_hint(self, do_hint: bool, card_hints, hint_type, hint_value):
+    if hint_type == 'colour':
+      extract = lambda card: card[0]
+    else:
+      extract = lambda card: card[1]
 
     # Send the hint to the other players
-    if hint_type == 'colour':
-      return {
-        (card_colour, card_value): False if (
-          (card_colour != hint_value and do_hint) or
-          (card_colour == hint_value and not do_hint)
-        ) else card_hints[(card_colour, card_value)]
+    return {
+      card: False if (
+        (extract(card) != hint_value and do_hint) or
+        (extract(card) == hint_value and not do_hint)
+      ) else card_hints[card]
 
-        for card_colour in colour_values
-        for card_value in card_values
-      }
-    else:
-      return {
-        (card_colour, card_value): False if (
-          (card_value != hint_value and do_hint) or
-          (card_value == hint_value and not do_hint)
-        ) else card_hints[(card_colour, card_value)]
-
-        for card_colour in colour_values
-        for card_value in card_values
-      }
+      for card in itertools.product(colour_values, card_values)
+    }
 
   def apply_action(self, player_id: int, action: Action):
     if action.name == 'discard':
