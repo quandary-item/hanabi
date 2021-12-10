@@ -335,6 +335,31 @@ class GameState:
         # pick a hint if there aren't any cards that can be played next
 
 
+  def apply_hint(self, card_id, card_hints, card_ids_to_hint, hint_type, hint_value):
+
+    do_hint = card_id in card_ids_to_hint
+
+    # Send the hint to the other players
+    if hint_type == 'colour':
+      return {
+        (card_colour, card_value): False if (
+          (card_colour != hint_value and do_hint) or
+          (card_colour == hint_value and not do_hint)
+        ) else card_hints[(card_colour, card_value)]
+
+        for card_colour in colour_values
+        for card_value in card_values
+      }
+    else:
+      return {
+        (card_colour, card_value): False if (
+          (card_value != hint_value and do_hint) or
+          (card_value == hint_value and not do_hint)
+        ) else card_hints[(card_colour, card_value)]
+
+        for card_colour in colour_values
+        for card_value in card_values
+      }
 
   def apply_action(self, player_id: int, action: Action):
     if action.name == 'discard':
@@ -387,33 +412,16 @@ class GameState:
       self.hints_remaining -= 1
       (other_player_id, card_ids_to_hint, hint_type, hint_value) = action.args
 
-      card_ids_to_unhint = set(self.get_usable_cards(other_player_id)) - set(card_ids_to_hint)
-
-      # Send the hint to the other players
-      if hint_type == 'colour':
-        # mark the cards that were hinted
-        other_colours = [value for value in colour_values if value != hint_value]
-        for card_id in card_ids_to_hint:
-          for colour in other_colours:
-            for other_card_value in card_values:
-              self.hints[other_player_id][card_id][(colour, other_card_value)] = False
-
-        # mark the cards that were not hinted
-        for card_id in card_ids_to_unhint:
-          for other_card_value in card_values:
-            self.hints[other_player_id][card_id][(hint_value, other_card_value)] = False
-      else:
-        # mark the cards that were hinted
-        other_values = [value for value in card_values if value != hint_value]
-        for card_id in card_ids_to_hint:
-          for other_value in other_values:
-            for colour in colour_values:
-              self.hints[other_player_id][card_id][(colour, other_value)] = False
-
-        # mark the cards that were not hinted
-        for card_id in card_ids_to_unhint:
-          for colour in colour_values:
-            self.hints[other_player_id][card_id][(colour, hint_value)] = False
+      self.hints[other_player_id] = [
+        self.apply_hint(
+          card_id,
+          self.hints[other_player_id][card_id],
+          card_ids_to_hint,
+          hint_type,
+          hint_value
+        )
+        for card_id in self.get_usable_cards(other_player_id)
+      ]
 
 
 colour_code = {'red': Fore.RED, 'yellow': Fore.YELLOW, 'green': Fore.GREEN, 'blue': Fore.BLUE, 'white': Fore.BLACK}
