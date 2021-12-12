@@ -586,7 +586,7 @@ def select_action(hands, actions: List[Action]):
 
 def possible_cards_from_hints(hints, card_counts):
   for colour, value in hints.keys():
-    if hints[(colour, value)] and CARD_COUNTS[colour][value] - card_counts[colour][value > 0]:
+    if hints[(colour, value)] and CARD_COUNTS[colour][value] - card_counts[colour][value] > 0:
       yield (colour, value)
 
 
