@@ -320,7 +320,7 @@ class GameState:
     for i in range(1, num_players):
       other_player_id = (i + player_id) % num_players
 
-      # TODO: Look for hints for playing and discarding cards separately
+      print(f'thinking of hints for {other_player_id}')
 
       # does the other player have any cards that can be played now?
       can_play_ids = set(self.get_card_ids_player_can_play(other_player_id))
