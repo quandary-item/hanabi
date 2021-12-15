@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import itertools
 import random
 from colorama import Fore, init  # type: ignore
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import Any, DefaultDict, Dict, List, Literal, Optional, Set, Tuple
 
 
 Colour = Literal['red', 'yellow', 'green', 'blue', 'white']
@@ -178,16 +178,19 @@ class GameState:
     if self.hints_remaining > 0:
       # give a hint to any other player (if there are enough hint tokens left)
       for other_player_id, other_hand in enumerate(self.hands):
-        if other_player_id != player_id:
-          # set of unique colours
-          for colour in set([card.colour for card in other_hand if card]):
-            other_players_cards = [i for i, card in enumerate(other_hand) if card and card.colour == colour]
-            actions.append(Action('hint', [other_player_id, other_players_cards, 'colour', colour]))
+        card_ids_by_colour: DefaultDict[str, List[int]] = defaultdict(list)
+        card_ids_by_value: DefaultDict[int, List[int]] = defaultdict(list)
 
-          # set of unique numbers
-          for value in set([card.value for card in other_hand if card]):
-            other_players_cards = [i for i, card in enumerate(other_hand) if card and card.value == value]
-            actions.append(Action('hint', [other_player_id, other_players_cards, 'value', value]))
+        for card_id, card in enumerate(other_hand):
+          if card:
+            card_ids_by_colour[card.colour].append(card_id)
+            card_ids_by_value[card.value].append(card_id)
+
+        for colour, card_ids in card_ids_by_colour.items():
+          actions.append(Action('hint', [other_player_id, card_ids, 'colour', colour]))
+
+        for value, card_ids in card_ids_by_value.items():
+          actions.append(Action('hint', [other_player_id, card_ids, 'value', value]))
 
     return actions
 
