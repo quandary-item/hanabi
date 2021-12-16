@@ -53,7 +53,6 @@ class Action:
 # TODO: if hints have been given for all of the cards in the other players hands, and you have no other
 # actions you can take, then you can give a redundant hint
 
-# TODO: update the hint formatting for empty slots in players' hands (just blank out the box?)
 # TODO: it looks like some hints are just plain wrong still? wtf?
 # TODO: it looks like some cards are vanishing into the void?
 
@@ -656,13 +655,16 @@ def run():
     # compared probabilities
     for i, hand in enumerate(game.hands):
       if i == current_player:
-        # print('*', format_hand(hand), Fore.BLACK)
-        print(Fore.BLACK + '*', '------')
+        print('*', format_hand(hand), Fore.BLACK)
       else:
         print(' ', format_hand(hand), Fore.BLACK)
 
     # selected_action_i = get_int()
     action = game.select_action_ai(None, current_player, actions)
+
+    if not action:
+      print('game over: there are no more available actions')
+      return
     print(f'ai recommended action:{action}')
 
     # action = actions[selected_action_i]
@@ -673,7 +675,7 @@ def run():
       game.apply_action(current_player, action)
     except GameOver as e:
       print('game over:', e)
-      break
+      return
     current_player = (current_player + 1) % num_players
 
 
