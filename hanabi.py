@@ -98,7 +98,7 @@ class PlayerKnowledge:
 
   def see_card(self, card):
     # Call this when somebody drew a card
-    print(f'player {self.index} just saw {card}')
+    # print(f'player {self.index} just saw {card}')
     self.card_counts[card.colour][card.value] += 1
 
 def initial_hints():
@@ -295,9 +295,7 @@ class GameState:
     # print(f'required cards: {required_cards}')
 
     if last_move:
-
       pass
-
 
     usable_cards = self.get_usable_cards(player_id)
     player_hints = self.hints[player_id]
@@ -317,7 +315,7 @@ class GameState:
     # print(f'can play: {cards_to_play}')
 
     if self.hints_remaining == 0:
-      return random.choice(actions)
+      return random.choice(actions) if actions else None
 
     # give a hint
     # iterate over the other players, starting with the next player
@@ -325,7 +323,7 @@ class GameState:
     for i in range(1, num_players):
       other_player_id = (i + player_id) % num_players
 
-      print(f'thinking of hints for {other_player_id}')
+      # print(f'thinking of hints for {other_player_id}')
 
       # does the other player have any cards that can be played now?
       can_play_ids = set(self.get_card_ids_player_can_play(other_player_id))
@@ -414,10 +412,10 @@ class GameState:
         if cards_that_can_be_played:
           good_play_hints[hint_value] = cards_that_can_be_played
 
-      print(f'discard hints: {discard_hints_needed}')
-      print(f'play hints: {play_hints_needed}')
-      print(f'good discard hints: {good_discard_hints}')
-      print(f'good play hints: {good_play_hints}')
+      # print(f'discard hints: {discard_hints_needed}')
+      # print(f'play hints: {play_hints_needed}')
+      # print(f'good discard hints: {good_discard_hints}')
+      # print(f'good play hints: {good_play_hints}')
 
       # choose the hint that is needed by the most cards
       cards_that_dont_need_hints = (can_play_ids | can_discard_ids) - cards_that_need_hints
@@ -455,11 +453,13 @@ class GameState:
     self.discard_pile.append(card)
 
     if not self.is_card_on_table(card):
-      print(f'discarded a card that has not been played yet {card}')
+      # print(f'discarded a card that has not been played yet {card}')
       if not self.are_there_cards_remaining_of_this_type(card):
-        raise GameOver(f'game over: the last copy of this card {card} has been discarded')
+        raise GameOver(f'the last copy of this card {card} has been discarded')
 
   def apply_action(self, player_id: int, action: Action):
+    if not action:
+      raise GameOver('no more actions')
     if action.name == 'discard':
       (card_id,) = action.args
 
@@ -725,6 +725,27 @@ def run():
     current_player = (current_player + 1) % num_players
 
 
+def bulk_run():
+  num_players = 5
+  current_player = 0
+
+  game = GameState([PlayerKnowledge(i) for i in range(num_players)])
+  # print(format_deck(game.deck))
+
+  while True:
+    actions = game.get_available_actions(current_player)
+    action = game.select_action_ai(None, current_player, actions)
+
+    try:
+      game.apply_action(current_player, action)
+    except GameOver as e:
+      print(Fore.BLACK + 'table:', format_table(game.table))
+      print('game over:', e)
+      return
+    current_player = (current_player + 1) % num_players
+
+
 if __name__ == '__main__':
   init()
-  run()
+  for i in range(10):
+    bulk_run()
