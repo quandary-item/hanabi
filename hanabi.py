@@ -53,6 +53,9 @@ class Action:
 # TODO: if hints have been given for all of the cards in the other players hands, and you have no other
 # actions you can take, then you can give a redundant hint
 # TODO: it looks like some hints are just plain wrong still? wtf?
+# TODO: consider opening/middlegame/endgame strategy - should different things be prioritised?
+# TODO: consider tree search of some kind
+# TODO: make this faster, it's so slow
 
 # How do you describe what you know about the things that other people know?
 
@@ -747,5 +750,5 @@ def bulk_run():
 
 if __name__ == '__main__':
   init()
-  for i in range(10):
+  for i in range(100):
     bulk_run()
