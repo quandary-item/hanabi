@@ -98,6 +98,7 @@ class PlayerKnowledge:
 
   def see_card(self, card):
     # Call this when somebody drew a card
+    print(f'player {self.index} just saw {card}')
     self.card_counts[card.colour][card.value] += 1
 
 def initial_hints():
@@ -469,10 +470,8 @@ class GameState:
       # invalidate hint
       self.hints[player_id][card_id] = initial_hints()
 
-      # other players see card
-      for player in self.players:
-        if player.index != player_id:
-          player.see_card(card)
+      # the current player see the card they just discarded
+      self.players[player_id].see_card(card)
 
       self.put_card_on_discard_pile(card)
 
@@ -481,7 +480,12 @@ class GameState:
 
       # draw a new card
       if len(self.deck) > 0:
-        self.hands[player_id][card_id] = self.deck.pop()
+        new_card = self.deck.pop()
+        self.hands[player_id][card_id] = new_card
+        # other players see the card that was just drawn
+        for player in self.players:
+          if player.index != player_id:
+            player.see_card(new_card)
 
     elif action.name == 'play':
       (card_id,) = action.args
@@ -493,10 +497,8 @@ class GameState:
       # invalidate hint
       self.hints[player_id][card_id] = initial_hints()
 
-      # other players see card
-      for player in self.players:
-        if player.index != player_id:
-          player.see_card(card)
+      # the current player see the card they just played
+      self.players[player_id].see_card(card)
 
       # can we play this card?
       # get the part of the table with the right colour
@@ -515,7 +517,12 @@ class GameState:
         pass
       # draw a new card
       if len(self.deck) > 0:
-        self.hands[player_id][card_id] = self.deck.pop()
+        new_card = self.deck.pop()
+        self.hands[player_id][card_id] = new_card
+        # other players see the card that was just drawn
+        for player in self.players:
+          if player.index != player_id:
+            player.see_card(new_card)
 
     elif action.name == 'hint':
       self.hints_remaining -= 1
@@ -666,7 +673,7 @@ def run():
     print('hints:')
     for player_id in range(num_players):
       print(player_id, 'hints')
-      print(''.join(format_hints(game.hands[player_id], game.hints[player_id], game.players[current_player].card_counts)))
+      print(''.join(format_hints(game.hands[player_id], game.hints[player_id], game.players[player_id].card_counts)))
     # print('deck:', format_deck(game.deck))
     print('discard pile:', format_deck(game.discard_pile))
     print(Fore.BLACK + 'table:', format_table(game.table))
@@ -683,6 +690,20 @@ def run():
         print('*', format_hand(hand), Fore.BLACK)
       else:
         print(' ', format_hand(hand), Fore.BLACK)
+
+
+    # # hint sanity check
+    # for card_id in game.get_usable_cards(current_player):
+    #   card = game.hands[current_player][card_id]
+    #   if not game.hints[current_player][card_id][(card.colour, card.value)]:
+    #     print(f'the hint for card {card_id} in {current_player}\'s hand is wrong')
+    #     import ipdb;ipdb.set_trace()
+    #   count_seen = game.players[current_player].card_counts[card.colour][card.value]
+    #   total_count = CARD_COUNTS[card.colour][card.value]
+    #   if total_count - count_seen == 0:
+    #     print(f'the count for {card_id} in {current_player}\'s hand is wrong')
+    #     print(card_id, total_count - count_seen, card)
+    #     import ipdb;ipdb.set_trace()
 
     # selected_action_i = get_int()
     action = game.select_action_ai(None, current_player, actions)
