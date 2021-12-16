@@ -491,6 +491,9 @@ class GameState:
       else:
         self.mistakes_remaining -= 1
 
+        # put it in the discard pile
+        self.discard_pile.append(card)
+
         if self.mistakes_remaining == 0:
           # lose
           raise GameOver('ran out of mistakes')
