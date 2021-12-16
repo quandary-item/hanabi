@@ -213,9 +213,7 @@ class GameState:
     discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
 
     for card_id in usable_cards:
-      possible_cards = set(
-        possible_cards_from_hints(player_hints[card_id], player_card_counts)
-      )
+      possible_cards = possible_cards_from_hints(player_hints[card_id], player_card_counts)
 
       can_discard = True
       for card_colour, card_value in possible_cards:
@@ -231,9 +229,7 @@ class GameState:
     required_cards = self.get_required_cards()
 
     for card_id in usable_cards:
-      possible_cards = set(
-        possible_cards_from_hints(player_hints[card_id], player_card_counts)
-      )
+      possible_cards = possible_cards_from_hints(player_hints[card_id], player_card_counts)
       if all([card in required_cards for card in possible_cards]):
         yield card_id
 
