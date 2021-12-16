@@ -52,9 +52,6 @@ class Action:
 
 # TODO: if hints have been given for all of the cards in the other players hands, and you have no other
 # actions you can take, then you can give a redundant hint
-
-# TODO: if it is no longer possible to win (if a card that is needed on the table is discarded/played at
-# the wrong time), then game over
 # TODO: it looks like some hints are just plain wrong still? wtf?
 # TODO: it looks like some cards are vanishing into the void?
 
@@ -442,6 +439,25 @@ class GameState:
 
         # pick a hint if there aren't any cards that can be played next
 
+  def is_card_on_table(self, card: Card):
+    # returns True if a card with this colour and value is on the table
+    table_value = self.table[card.colour]
+    return card.value <= table_value
+
+  def are_there_cards_remaining_of_this_type(self, card: Card):
+    total_card_count = CARD_COUNTS[card.colour][card.value]
+    num_matching_cards_in_discard_pile = len([c for c in self.discard_pile
+                                              if c.colour == card.colour and c.value == card.value])
+    return num_matching_cards_in_discard_pile < total_card_count
+
+  def put_card_on_discard_pile(self, card: Card):
+    # put it in the discard pile
+    self.discard_pile.append(card)
+
+    if not self.is_card_on_table(card):
+      print(f'discarded a card that has not been played yet {card}')
+      if not self.are_there_cards_remaining_of_this_type(card):
+        raise GameOver(f'game over: the last copy of this card {card} has been discarded')
 
   def apply_action(self, player_id: int, action: Action):
     if action.name == 'discard':
@@ -459,8 +475,7 @@ class GameState:
         if player.index != player_id:
           player.see_card(card)
 
-      # put it in the discard pile
-      self.discard_pile.append(card)
+      self.put_card_on_discard_pile(card)
 
       # increment number of remaining hints
       self.hints_remaining += 1
@@ -492,7 +507,7 @@ class GameState:
         self.mistakes_remaining -= 1
 
         # put it in the discard pile
-        self.discard_pile.append(card)
+        self.put_card_on_discard_pile(card)
 
         if self.mistakes_remaining == 0:
           # lose
