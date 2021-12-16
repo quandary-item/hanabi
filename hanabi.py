@@ -53,6 +53,8 @@ class Action:
 # TODO: if hints have been given for all of the cards in the other players hands, and you have no other
 # actions you can take, then you can give a redundant hint
 
+# TODO: if it is no longer possible to win (if a card that is needed on the table is discarded/played at
+# the wrong time), then game over
 # TODO: it looks like some hints are just plain wrong still? wtf?
 # TODO: it looks like some cards are vanishing into the void?
 
