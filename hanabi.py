@@ -544,27 +544,33 @@ def format_hand(hand):
       parts.append(' ')
   return ''.join(parts)
 
-def format_hints(player_hints, card_counts):
+def format_hints(hand, player_hints, card_counts):
   for colour in colour_values:
     for card_id in ALL_CARD_IDS:
       yield Fore.BLACK
       yield '|'
-      for value in card_values:
-        if player_hints[card_id][(colour, value)]:
-          yield colour_code[colour]
 
-          # num cards that have not been seen or played/discarded
-          num_cards_remaining = CARD_COUNTS[colour][value] - card_counts[colour][value]
-          if num_cards_remaining == 3:
-            yield str(value) * 3
-          elif num_cards_remaining == 2:
-            yield str(value) * 2 + ' '
-          elif num_cards_remaining == 1:
-            yield str(value) + '  '
+      if hand[card_id]:
+        for value in card_values:
+          if player_hints[card_id][(colour, value)]:
+            yield colour_code[colour]
+
+            # num cards that have not been seen or played/discarded
+            num_cards_remaining = CARD_COUNTS[colour][value] - card_counts[colour][value]
+            if num_cards_remaining == 3:
+              yield str(value) * 3
+            elif num_cards_remaining == 2:
+              yield str(value) * 2 + ' '
+            elif num_cards_remaining == 1:
+              yield str(value) + '  '
+            else:
+              yield '   '
           else:
             yield '   '
-        else:
+      else:
+        for value in card_values:
           yield '   '
+
     yield Fore.BLACK
     yield '|'
     yield '\n'
@@ -643,7 +649,7 @@ def run():
     print('hints:')
     for player_id in range(num_players):
       print(player_id, 'hints')
-      print(''.join(format_hints(game.hints[player_id], game.players[current_player].card_counts)))
+      print(''.join(format_hints(game.hands[player_id], game.hints[player_id], game.players[current_player].card_counts)))
     # print('deck:', format_deck(game.deck))
     print('discard pile:', format_deck(game.discard_pile))
     print(Fore.BLACK + 'table:', format_table(game.table))
