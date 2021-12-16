@@ -53,7 +53,6 @@ class Action:
 # TODO: if hints have been given for all of the cards in the other players hands, and you have no other
 # actions you can take, then you can give a redundant hint
 # TODO: it looks like some hints are just plain wrong still? wtf?
-# TODO: it looks like some cards are vanishing into the void?
 
 # How do you describe what you know about the things that other people know?
 
