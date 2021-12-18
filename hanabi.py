@@ -141,27 +141,19 @@ class DiscardPile:
 
 
 class GameState:
-  def __init__(self, players: List[PlayerKnowledge]) -> None:
+  def __init__(self, players: List[PlayerKnowledge], deck) -> None:
     self.players = players
 
-    self.deck = create_deck()
+    self.deck = deck
     self.discard_pile = DiscardPile()
     self.table: Dict[str, int] = {c: 0 for c in colour_values}
 
     self.hints_remaining = 8
     self.mistakes_remaining = 3
 
+    self.hints = [[initial_hints() for card_id in ALL_CARD_IDS]
+                   for player in self.players]
     self.init_hands()
-    self.init_hints()
-
-  def init_hints(self):
-    self.hints = []
-    for player in self.players:
-      player_hints = []
-      for card_id in ALL_CARD_IDS:
-        player_hints.append(initial_hints())
-
-      self.hints.append(player_hints)
 
   def init_hands(self):
     self.hands = []
@@ -667,7 +659,7 @@ def run():
   num_players = 5
   current_player = 0
 
-  game = GameState([PlayerKnowledge(i) for i in range(num_players)])
+  game = GameState([PlayerKnowledge(i) for i in range(num_players)], create_deck())
   print(format_deck(game.deck))
 
   while True:
