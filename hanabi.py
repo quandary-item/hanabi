@@ -371,8 +371,6 @@ class GameState:
                 discard_hints_needed[card.value].add(card_id)
                 cards_that_need_hints.add(card_id)
 
-      self.players[player_id].card_counts
-
       other_player_usable_cards = self.get_usable_cards(other_player_id)
       other_player_card_counts = self.get_card_counts(exclude_hands=[player_id, other_player_id])
 
