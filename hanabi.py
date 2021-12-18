@@ -175,6 +175,9 @@ class GameState:
             other_player.see_card(card)
       self.hands.append(hand)
 
+  def get_score(self):
+    return sum(self.table.values())
+
   def get_usable_cards(self, player_id: int):
     result = []
     for i, card in enumerate(self.hands[player_id]):
@@ -228,7 +231,8 @@ class GameState:
 
       can_discard = True
       for card_colour, card_value in possible_cards:
-        num_cards_not_discarded = CARD_COUNTS[card_colour][card_value] - self.discard_pile.get_count(card_colour, card_value)
+        num_cards_not_discarded = (CARD_COUNTS[card_colour][card_value] -
+          self.discard_pile.get_count(card_colour, card_value))
         # if the card has already been played, then it can also be discarded
         already_played = card_value <= self.table[card_colour]
         if not already_played and num_cards_not_discarded == 1:
@@ -247,7 +251,8 @@ class GameState:
   def get_card_ids_player_can_discard(self, player_id):
     for card_id in self.get_usable_cards(player_id):
       card = self.hands[player_id][card_id]
-      num_cards_not_discarded = CARD_COUNTS[card.colour][card.value] - self.discard_pile.get_count(card.colour, card.value)
+      num_cards_not_discarded = (CARD_COUNTS[card.colour][card.value] -
+        self.discard_pile.get_count(card.colour, card.value))
       already_played = card.value <= self.table[card.colour]
       if not already_played and num_cards_not_discarded > 1:
         yield card_id
@@ -745,11 +750,21 @@ def bulk_run():
     except GameOver as e:
       print(Fore.BLACK + 'table:', format_table(game.table))
       print('game over:', e)
-      return
+      break
     current_player = (current_player + 1) % num_players
+  score = game.get_score()
+  print(f'score: {score}')
+  return score
 
 
 if __name__ == '__main__':
   init()
-  for i in range(100):
-    bulk_run()
+  num_games = 100
+  scores = []
+  for i in range(num_games):
+    score = bulk_run()
+    scores.append(score)
+  print(scores)
+  print(f'highest score: {max(scores)}')
+  print(f'lowest score: {min(scores)}')
+  print(f'mean score: {sum(scores) / num_games}')
