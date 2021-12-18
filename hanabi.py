@@ -127,12 +127,25 @@ def apply_hint(do_hint: bool, card_hints, hint_type, hint_value):
     for card in itertools.product(colour_values, card_values)
   }
 
+class DiscardPile:
+  def __init__(self) -> None:
+    self.cards: List[Card] = []
+    self.counts = Counter()
+
+  def add_card(self, card):
+    self.cards.append(card)
+    self.counts[(card.colour, card.value)] += 1
+
+  def get_count(self, colour, value):
+    return self.counts[(colour, value)]
+
+
 class GameState:
   def __init__(self, players: List[PlayerKnowledge]) -> None:
     self.players = players
 
     self.deck = create_deck()
-    self.discard_pile: List[Card] = []
+    self.discard_pile = DiscardPile()
     self.table: Dict[str, int] = {c: 0 for c in colour_values}
 
     self.hints_remaining = 8
@@ -210,14 +223,12 @@ class GameState:
     return required_cards
 
   def get_card_ids_player_can_discard_from_hints(self, usable_cards, player_hints, player_card_counts):
-    discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
-
     for card_id in usable_cards:
       possible_cards = possible_cards_from_hints(player_hints[card_id], player_card_counts)
 
       can_discard = True
       for card_colour, card_value in possible_cards:
-        num_cards_not_discarded = CARD_COUNTS[card_colour][card_value] - discard_pile_counts[(card_colour, card_value)]
+        num_cards_not_discarded = CARD_COUNTS[card_colour][card_value] - self.discard_pile.get_count(card_colour, card_value)
         # if the card has already been played, then it can also be discarded
         already_played = card_value <= self.table[card_colour]
         if not already_played and num_cards_not_discarded == 1:
@@ -234,11 +245,9 @@ class GameState:
         yield card_id
 
   def get_card_ids_player_can_discard(self, player_id):
-    discard_pile_counts = Counter([(card.colour, card.value) for card in self.discard_pile])
-
     for card_id in self.get_usable_cards(player_id):
       card = self.hands[player_id][card_id]
-      num_cards_not_discarded = CARD_COUNTS[card.colour][card.value] - discard_pile_counts[(card.colour, card.value)]
+      num_cards_not_discarded = CARD_COUNTS[card.colour][card.value] - self.discard_pile.get_count(card.colour, card.value)
       already_played = card.value <= self.table[card.colour]
       if not already_played and num_cards_not_discarded > 1:
         yield card_id
@@ -256,7 +265,7 @@ class GameState:
     card_counts = {colour: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0} for colour in colour_values}
 
     # add up counts in the discard pile
-    for card in self.discard_pile:
+    for card in self.discard_pile.cards:
       card_counts[card.colour][card.value] += 1
 
     # add up counts on the table
@@ -300,14 +309,12 @@ class GameState:
     player_hints = self.hints[player_id]
     player_card_counts = self.get_card_counts(exclude_hands=[player_id])
 
-    cards_to_play = list(self.get_card_ids_player_can_play_from_hints(usable_cards, player_hints, player_card_counts))
-    if cards_to_play:
-      action = [a for a in actions if a.name == 'play' and a.args[0] in cards_to_play][0]
+    for card_id in self.get_card_ids_player_can_play_from_hints(usable_cards, player_hints, player_card_counts):
+      action = [a for a in actions if a.name == 'play' and a.args[0] == card_id][0]
       return action
 
-    cards_to_discard = list(self.get_card_ids_player_can_discard_from_hints(usable_cards, player_hints, player_card_counts))
-    if cards_to_discard:
-      action = [a for a in actions if a.name == 'discard' and a.args[0] in cards_to_discard][0]
+    for card_id in self.get_card_ids_player_can_discard_from_hints(usable_cards, player_hints, player_card_counts):
+      action = [a for a in actions if a.name == 'discard' and a.args[0] == card_id][0]
       return action
 
     # print(f'can discard: {cards_to_discard}')
@@ -443,13 +450,11 @@ class GameState:
 
   def are_there_cards_remaining_of_this_type(self, card: Card):
     total_card_count = CARD_COUNTS[card.colour][card.value]
-    num_matching_cards_in_discard_pile = len([c for c in self.discard_pile
-                                              if c.colour == card.colour and c.value == card.value])
-    return num_matching_cards_in_discard_pile < total_card_count
+    return self.discard_pile.get_count(card.colour, card.value) < total_card_count
 
   def put_card_on_discard_pile(self, card: Card):
     # put it in the discard pile
-    self.discard_pile.append(card)
+    self.discard_pile.add_card(card)
 
     if not self.is_card_on_table(card):
       # print(f'discarded a card that has not been played yet {card}')
@@ -674,7 +679,7 @@ def run():
       print(player_id, 'hints')
       print(''.join(format_hints(game.hands[player_id], game.hints[player_id], game.players[player_id].card_counts)))
     # print('deck:', format_deck(game.deck))
-    print('discard pile:', format_deck(game.discard_pile))
+    print('discard pile:', format_deck(game.discard_pile.cards))
     print(Fore.BLACK + 'table:', format_table(game.table))
     print('hints remaining:', game.hints_remaining)
     print('mistakes remaining:', game.mistakes_remaining)
