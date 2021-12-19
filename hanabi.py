@@ -268,162 +268,6 @@ class GameState:
     return card_counts
 
 
-  def select_action_ai(self, last_move: Action, player_id: int, actions: List[Action]):
-
-    # some strategies
-    # - "avoid failure": with the information that the current player has, guess what the next player would do
-    #   if the next player would do something that 1. causes them to lose the game 2. causes a mistake to happen
-    #   then give them a hint so that that doesn't happen. this could allow us to be a little bit more loose with
-    #   the play/discard logic. also this would be useful if the number of available hints is a low number
-    # - "play for success": look at the required cards, if the next player could play any of them, then give them
-    #   a hint
-    # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
-    #   replenishing hints?)
-
-    # - "remember hints": e.g if a player gave you a hint that you have a "one" and since then nobody has played
-    #   a one, then assume you can play that card. same goes for other colours etc. also need to change logic so
-    #   that players aren't given redundant hints?
-
-    # if you have a card you know can be played (using hints + card counting), then play it
-    # print(f'required cards: {required_cards}')
-
-    if last_move:
-      pass
-
-    usable_cards = self.get_usable_cards(player_id)
-    player_hints = self.hints[player_id]
-    player_card_counts = self.get_card_counts(exclude_hands=[player_id])
-
-    for card_id in self.get_card_ids_player_can_play_from_hints(usable_cards, player_hints, player_card_counts):
-      action = [a for a in actions if a.name == 'play' and a.args[0] == card_id][0]
-      return action
-
-    for card_id in self.get_card_ids_player_can_discard_from_hints(usable_cards, player_hints, player_card_counts):
-      action = [a for a in actions if a.name == 'discard' and a.args[0] == card_id][0]
-      return action
-
-    # print(f'can discard: {cards_to_discard}')
-    # print(f'can play: {cards_to_play}')
-
-    if self.hints_remaining == 0:
-      return random.choice(actions) if actions else None
-
-    # give a hint
-    # iterate over the other players, starting with the next player
-    for i in range(1, self.num_players):
-      other_player_id = (i + player_id) % self.num_players
-
-      # print(f'thinking of hints for {other_player_id}')
-
-      # does the other player have any cards that can be played now?
-      can_play_ids = set(self.get_card_ids_player_can_play(other_player_id))
-      can_discard_ids = set(self.get_card_ids_player_can_discard(other_player_id))
-
-      # check if this card is 'covered' by the hints
-      cards_that_need_hints = set()
-
-      play_hints_needed = defaultdict(set)
-      # print(f'can play ids: {can_play_ids}')
-      # print(f'can discard ids: {can_discard_ids}')
-      for card_id in can_play_ids:
-        card = self.hands[other_player_id][card_id]
-
-        for colour in colour_values:
-          for value in card_values:
-            if colour != card.colour:
-              if self.hints[other_player_id][card_id][(colour, value)]:
-                play_hints_needed[card.colour].add(card_id)
-                cards_that_need_hints.add(card_id)
-
-            if value != card.value:
-              if self.hints[other_player_id][card_id][(colour, value)]:
-                play_hints_needed[card.value].add(card_id)
-                cards_that_need_hints.add(card_id)
-
-      discard_hints_needed = defaultdict(set)
-      # print(f'can play ids: {can_play_ids}')
-      # print(f'can discard ids: {can_discard_ids}')
-      for card_id in can_discard_ids:
-        card = self.hands[other_player_id][card_id]
-
-        for colour in colour_values:
-          for value in card_values:
-            if colour != card.colour:
-              if self.hints[other_player_id][card_id][(colour, value)]:
-                discard_hints_needed[card.colour].add(card_id)
-                cards_that_need_hints.add(card_id)
-
-            if value != card.value:
-              if self.hints[other_player_id][card_id][(colour, value)]:
-                discard_hints_needed[card.value].add(card_id)
-                cards_that_need_hints.add(card_id)
-
-      other_player_usable_cards = self.get_usable_cards(other_player_id)
-      other_player_card_counts = self.get_card_counts(exclude_hands=[player_id, other_player_id])
-
-      good_discard_hints = {}
-      for hint_value, card_ids_to_hint in (discard_hints_needed).items():
-        hint_type = 'colour' if hint_value in colour_values else 'value'
-        updated_hints = [
-          apply_hint(
-            card_id in card_ids_to_hint,
-            self.hints[other_player_id][card_id],
-            hint_type,
-            hint_value
-          )
-          for card_id in range(5)
-        ]
-        # if the hint is applied, would the new cards be in
-        # but use the current player's card counts, because the current playet doesn't know how many cards the other player has seen
-        cards_that_can_be_discarded = list(self.get_card_ids_player_can_discard_from_hints(
-          other_player_usable_cards, updated_hints, other_player_card_counts))
-        if cards_that_can_be_discarded:
-          good_discard_hints[hint_value] = cards_that_can_be_discarded
-
-      good_play_hints = {}
-      for hint_value, card_ids_to_hint in (play_hints_needed).items():
-        hint_type = 'colour' if hint_value in colour_values else 'value'
-        updated_hints = [
-          apply_hint(
-            card_id in card_ids_to_hint,
-            self.hints[other_player_id][card_id],
-            hint_type,
-            hint_value
-          )
-          for card_id in range(5)
-        ]
-
-        # if the hint is applied, would the new cards be in
-        # but use the current player's card counts, because the current playet doesn't know how many cards the other player has seen
-        cards_that_can_be_played = list(self.get_card_ids_player_can_play_from_hints(
-          other_player_usable_cards, updated_hints, other_player_card_counts))
-        if cards_that_can_be_played:
-          good_play_hints[hint_value] = cards_that_can_be_played
-
-      # print(f'discard hints: {discard_hints_needed}')
-      # print(f'play hints: {play_hints_needed}')
-      # print(f'good discard hints: {good_discard_hints}')
-      # print(f'good play hints: {good_play_hints}')
-
-      # choose the hint that is needed by the most cards
-      cards_that_dont_need_hints = (can_play_ids | can_discard_ids) - cards_that_need_hints
-      if len(cards_that_dont_need_hints) == 0:
-        if discard_hints_needed:
-          if good_discard_hints:
-            best_hint = list(good_discard_hints.keys())[0]
-          else:
-            best_hint = max(discard_hints_needed.keys(), key=lambda k: len(discard_hints_needed[k]))
-          hint_action = [a for a in actions if a.name == 'hint' and a.args[0] == other_player_id and a.args[3] == best_hint][0]
-          return hint_action
-        elif play_hints_needed:
-          if good_play_hints:
-            best_hint = list(good_play_hints.keys())[0]
-          else:
-            best_hint = max(play_hints_needed.keys(), key=lambda k: len(play_hints_needed[k]))
-          hint_action = [a for a in actions if a.name == 'hint' and a.args[0] == other_player_id and a.args[3] == best_hint][0]
-          return hint_action
-
-        # pick a hint if there aren't any cards that can be played next
 
   def is_card_on_table(self, card: Card):
     # returns True if a card with this colour and value is on the table
@@ -509,6 +353,166 @@ class GameState:
         )
         for card_id in range(5)
       ]
+
+
+class AI():
+  def select_action_ai(self, game: GameState, last_move: Action, player_id: int, actions: List[Action]):
+
+    # some strategies
+    # - "avoid failure": with the information that the current player has, guess what the next player would do
+    #   if the next player would do something that 1. causes them to lose the game 2. causes a mistake to happen
+    #   then give them a hint so that that doesn't happen. this could allow us to be a little bit more loose with
+    #   the play/discard logic. also this would be useful if the number of available hints is a low number
+    # - "play for success": look at the required cards, if the next player could play any of them, then give them
+    #   a hint
+    # - "allow discards": if the other players are able to discard any cards, then give them a hint (useful for
+    #   replenishing hints?)
+
+    # - "remember hints": e.g if a player gave you a hint that you have a "one" and since then nobody has played
+    #   a one, then assume you can play that card. same goes for other colours etc. also need to change logic so
+    #   that players aren't given redundant hints?
+
+    # if you have a card you know can be played (using hints + card counting), then play it
+    # print(f'required cards: {required_cards}')
+
+    if last_move:
+      pass
+
+    usable_cards = game.get_usable_cards(player_id)
+    player_hints = game.hints[player_id]
+    player_card_counts = game.get_card_counts(exclude_hands=[player_id])
+
+    for card_id in game.get_card_ids_player_can_play_from_hints(usable_cards, player_hints, player_card_counts):
+      action = [a for a in actions if a.name == 'play' and a.args[0] == card_id][0]
+      return action
+
+    for card_id in game.get_card_ids_player_can_discard_from_hints(usable_cards, player_hints, player_card_counts):
+      action = [a for a in actions if a.name == 'discard' and a.args[0] == card_id][0]
+      return action
+
+    # print(f'can discard: {cards_to_discard}')
+    # print(f'can play: {cards_to_play}')
+
+    if game.hints_remaining == 0:
+      return random.choice(actions) if actions else None
+
+    # give a hint
+    # iterate over the other players, starting with the next player
+    for i in range(1, game.num_players):
+      other_player_id = (i + player_id) % game.num_players
+
+      # print(f'thinking of hints for {other_player_id}')
+
+      # does the other player have any cards that can be played now?
+      can_play_ids = set(game.get_card_ids_player_can_play(other_player_id))
+      can_discard_ids = set(game.get_card_ids_player_can_discard(other_player_id))
+
+      # check if this card is 'covered' by the hints
+      cards_that_need_hints = set()
+
+      play_hints_needed = defaultdict(set)
+      # print(f'can play ids: {can_play_ids}')
+      # print(f'can discard ids: {can_discard_ids}')
+      for card_id in can_play_ids:
+        card = game.hands[other_player_id][card_id]
+
+        for colour in colour_values:
+          for value in card_values:
+            if colour != card.colour:
+              if game.hints[other_player_id][card_id][(colour, value)]:
+                play_hints_needed[card.colour].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+            if value != card.value:
+              if game.hints[other_player_id][card_id][(colour, value)]:
+                play_hints_needed[card.value].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+      discard_hints_needed = defaultdict(set)
+      # print(f'can play ids: {can_play_ids}')
+      # print(f'can discard ids: {can_discard_ids}')
+      for card_id in can_discard_ids:
+        card = game.hands[other_player_id][card_id]
+
+        for colour in colour_values:
+          for value in card_values:
+            if colour != card.colour:
+              if game.hints[other_player_id][card_id][(colour, value)]:
+                discard_hints_needed[card.colour].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+            if value != card.value:
+              if game.hints[other_player_id][card_id][(colour, value)]:
+                discard_hints_needed[card.value].add(card_id)
+                cards_that_need_hints.add(card_id)
+
+      other_player_usable_cards = game.get_usable_cards(other_player_id)
+      other_player_card_counts = game.get_card_counts(exclude_hands=[player_id, other_player_id])
+
+      good_discard_hints = {}
+      for hint_value, card_ids_to_hint in (discard_hints_needed).items():
+        hint_type = 'colour' if hint_value in colour_values else 'value'
+        updated_hints = [
+          apply_hint(
+            card_id in card_ids_to_hint,
+            game.hints[other_player_id][card_id],
+            hint_type,
+            hint_value
+          )
+          for card_id in range(5)
+        ]
+        # if the hint is applied, would the new cards be in
+        # but use the current player's card counts, because the current playet doesn't know how many cards the other player has seen
+        cards_that_can_be_discarded = list(game.get_card_ids_player_can_discard_from_hints(
+          other_player_usable_cards, updated_hints, other_player_card_counts))
+        if cards_that_can_be_discarded:
+          good_discard_hints[hint_value] = cards_that_can_be_discarded
+
+      good_play_hints = {}
+      for hint_value, card_ids_to_hint in (play_hints_needed).items():
+        hint_type = 'colour' if hint_value in colour_values else 'value'
+        updated_hints = [
+          apply_hint(
+            card_id in card_ids_to_hint,
+            game.hints[other_player_id][card_id],
+            hint_type,
+            hint_value
+          )
+          for card_id in range(5)
+        ]
+
+        # if the hint is applied, would the new cards be in
+        # but use the current player's card counts, because the current playet doesn't know how many cards the other player has seen
+        cards_that_can_be_played = list(game.get_card_ids_player_can_play_from_hints(
+          other_player_usable_cards, updated_hints, other_player_card_counts))
+        if cards_that_can_be_played:
+          good_play_hints[hint_value] = cards_that_can_be_played
+
+      # print(f'discard hints: {discard_hints_needed}')
+      # print(f'play hints: {play_hints_needed}')
+      # print(f'good discard hints: {good_discard_hints}')
+      # print(f'good play hints: {good_play_hints}')
+
+      # choose the hint that is needed by the most cards
+      cards_that_dont_need_hints = (can_play_ids | can_discard_ids) - cards_that_need_hints
+      if len(cards_that_dont_need_hints) == 0:
+        if discard_hints_needed:
+          if good_discard_hints:
+            best_hint = list(good_discard_hints.keys())[0]
+          else:
+            best_hint = max(discard_hints_needed.keys(), key=lambda k: len(discard_hints_needed[k]))
+          hint_action = [a for a in actions if a.name == 'hint' and a.args[0] == other_player_id and a.args[3] == best_hint][0]
+          return hint_action
+        elif play_hints_needed:
+          if good_play_hints:
+            best_hint = list(good_play_hints.keys())[0]
+          else:
+            best_hint = max(play_hints_needed.keys(), key=lambda k: len(play_hints_needed[k]))
+          hint_action = [a for a in actions if a.name == 'hint' and a.args[0] == other_player_id and a.args[3] == best_hint][0]
+          return hint_action
+
+        # pick a hint if there aren't any cards that can be played next
+
 
 
 colour_code = {'red': Fore.RED, 'yellow': Fore.YELLOW, 'green': Fore.GREEN, 'blue': Fore.BLUE, 'white': Fore.BLACK}
@@ -631,6 +635,8 @@ def run():
   current_player = 0
 
   game = GameState(num_players, create_deck())
+  ai = AI()
+
   print(format_deck(game.deck))
 
   while True:
@@ -678,7 +684,7 @@ def run():
     #     import ipdb;ipdb.set_trace()
 
     # selected_action_i = get_int()
-    action = game.select_action_ai(None, current_player, actions)
+    action = ai.select_action_ai(game, None, current_player, actions)
 
     if not action:
       print('game over: there are no more available actions')
@@ -702,11 +708,12 @@ def bulk_run():
   current_player = 0
 
   game = GameState(num_players, create_deck())
+  ai = AI()
   # print(format_deck(game.deck))
 
   while True:
     actions = game.get_available_actions(current_player)
-    action = game.select_action_ai(None, current_player, actions)
+    action = ai.select_action_ai(game, None, current_player, actions)
 
     try:
       game.apply_action(current_player, action)
