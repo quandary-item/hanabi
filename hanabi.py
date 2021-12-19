@@ -99,11 +99,6 @@ class PlayerKnowledge:
     self.index = index
     self.card_counts = {colour: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0} for colour in colour_values}
 
-  def see_card(self, card):
-    # Call this when somebody drew a card
-    # print(f'player {self.index} just saw {card}')
-    self.card_counts[card.colour][card.value] += 1
-
 def initial_hints():
   return {
     (colour, value): True
@@ -126,6 +121,7 @@ def apply_hint(do_hint: bool, card_hints, hint_type, hint_value):
 
     for card in itertools.product(colour_values, card_values)
   }
+
 
 class DiscardPile:
   def __init__(self) -> None:
@@ -162,9 +158,6 @@ class GameState:
       for i in ALL_CARD_IDS:
         card = self.deck.pop()
         hand.append(card)
-        for other_player_id, other_player in enumerate(self.players):
-          if player_id != other_player_id:
-            other_player.see_card(card)
       self.hands.append(hand)
 
   def get_score(self):
@@ -469,9 +462,6 @@ class GameState:
       # invalidate hint
       self.hints[player_id][card_id] = initial_hints()
 
-      # the current player see the card they just discarded
-      self.players[player_id].see_card(card)
-
       self.put_card_on_discard_pile(card)
 
       # increment number of remaining hints
@@ -481,10 +471,6 @@ class GameState:
       if len(self.deck) > 0:
         new_card = self.deck.pop()
         self.hands[player_id][card_id] = new_card
-        # other players see the card that was just drawn
-        for player in self.players:
-          if player.index != player_id:
-            player.see_card(new_card)
 
     elif action.name == 'play':
       (card_id,) = action.args
@@ -495,9 +481,6 @@ class GameState:
 
       # invalidate hint
       self.hints[player_id][card_id] = initial_hints()
-
-      # the current player see the card they just played
-      self.players[player_id].see_card(card)
 
       # can we play this card?
       # get the part of the table with the right colour
@@ -518,10 +501,6 @@ class GameState:
       if len(self.deck) > 0:
         new_card = self.deck.pop()
         self.hands[player_id][card_id] = new_card
-        # other players see the card that was just drawn
-        for player in self.players:
-          if player.index != player_id:
-            player.see_card(new_card)
 
     elif action.name == 'hint':
       self.hints_remaining -= 1
@@ -672,7 +651,7 @@ def run():
     print('hints:')
     for player_id in range(num_players):
       print(player_id, 'hints')
-      print(''.join(format_hints(game.hands[player_id], game.hints[player_id], game.players[player_id].card_counts)))
+      print(''.join(format_hints(game.hands[player_id], game.hints[player_id], game.get_card_counts(exclude_hands=[player_id]))))
     # print('deck:', format_deck(game.deck))
     print('discard pile:', format_deck(game.discard_pile.cards))
     print(Fore.BLACK + 'table:', format_table(game.table))
@@ -728,7 +707,7 @@ def bulk_run():
   num_players = 5
   current_player = 0
 
-  game = GameState([PlayerKnowledge(i) for i in range(num_players)])
+  game = GameState([PlayerKnowledge(i) for i in range(num_players)], create_deck())
   # print(format_deck(game.deck))
 
   while True:
