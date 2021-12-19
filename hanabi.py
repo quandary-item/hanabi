@@ -94,11 +94,6 @@ def create_deck() -> List[Card]:
   return deck
 
 
-class PlayerKnowledge:
-  def __init__(self, index):
-    self.index = index
-    self.card_counts = {colour: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0} for colour in colour_values}
-
 def initial_hints():
   return {
     (colour, value): True
@@ -137,8 +132,8 @@ class DiscardPile:
 
 
 class GameState:
-  def __init__(self, players: List[PlayerKnowledge], deck) -> None:
-    self.players = players
+  def __init__(self, num_players: int, deck: List[Card]) -> None:
+    self.num_players = num_players
 
     self.deck = deck
     self.discard_pile = DiscardPile()
@@ -148,12 +143,12 @@ class GameState:
     self.mistakes_remaining = 3
 
     self.hints = [[initial_hints() for card_id in ALL_CARD_IDS]
-                   for player in self.players]
+                   for player in range(self.num_players)]
     self.init_hands()
 
   def init_hands(self):
     self.hands = []
-    for player_id, player in enumerate(self.players):
+    for player_id in range(self.num_players):
       hand = []
       for i in ALL_CARD_IDS:
         card = self.deck.pop()
@@ -264,7 +259,7 @@ class GameState:
         card_counts[colour][v] += 1
 
     # add up counts in the (not excluded) hands
-    for player_id, player in enumerate(self.players):
+    for player_id in range(self.num_players):
       if player_id not in exclude_hands:
         for card in self.hands[player_id]:
           if card:
@@ -315,9 +310,8 @@ class GameState:
 
     # give a hint
     # iterate over the other players, starting with the next player
-    num_players = len(self.players)
-    for i in range(1, num_players):
-      other_player_id = (i + player_id) % num_players
+    for i in range(1, self.num_players):
+      other_player_id = (i + player_id) % self.num_players
 
       # print(f'thinking of hints for {other_player_id}')
 
@@ -636,7 +630,7 @@ def run():
   num_players = 5
   current_player = 0
 
-  game = GameState([PlayerKnowledge(i) for i in range(num_players)], create_deck())
+  game = GameState(num_players, create_deck())
   print(format_deck(game.deck))
 
   while True:
@@ -707,7 +701,7 @@ def bulk_run():
   num_players = 5
   current_player = 0
 
-  game = GameState([PlayerKnowledge(i) for i in range(num_players)], create_deck())
+  game = GameState(num_players, create_deck())
   # print(format_deck(game.deck))
 
   while True:
